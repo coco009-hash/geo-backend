@@ -11,7 +11,7 @@ const openai = new OpenAI({
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); // important pour parser le JSON
 
 // Route de test
 app.get("/", (req, res) => {
@@ -21,7 +21,28 @@ app.get("/", (req, res) => {
 // Route principale d'optimisation
 app.post("/api/optimize", async (req, res) => {
   try {
-    const { text, language = "fr", tone = "neutral", goal = "generic" } = req.body;
+    // 🔎 DEBUG : voir ce qui arrive vraiment
+    console.log("REQ BODY BRUT :", req.body);
+
+    // Certains environnements envoient le body comme string au lieu d'objet
+    let body = req.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        console.error("Erreur de parsing du body string :", e, body);
+        return res
+          .status(400)
+          .json({ error: "Corps de requête JSON invalide." });
+      }
+    }
+
+    const {
+      text,
+      language = "fr",
+      tone = "neutral",
+      goal = "generic",
+    } = body;
 
     if (!text || text.trim().length === 0) {
       return res.status(400).json({ error: "Le champ 'text' est obligatoire." });
@@ -90,3 +111,4 @@ Voici le texte à analyser et optimiser :
 app.listen(port, () => {
   console.log(`🚀 Serveur GEO lancé sur le port ${port}`);
 });
+
