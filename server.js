@@ -5,32 +5,49 @@ const OpenAI = require("openai");
 const app = express();
 const port = process.env.PORT || 3000;
 
-// IMPORTANT : middlewares
+// Middlewares
 app.use(cors());
-app.use(express.json());
 
-// Client OpenAI initialisé avec ta clé dans les variables d'environnement
+// ⚠️ On lit TOUT le body comme du texte, peu importe le Content-Type
+app.use(express.text({ type: "*/*" }));
+
+// Client OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Route de test
 app.get("/", (req, res) => {
-  res.json({ status: "ok", message: "GEO backend LIVE v1" });
+  res.json({ status: "ok", message: "GEO backend LIVE v2" });
 });
 
 // Route principale d'optimisation
 app.post("/api/optimize", async (req, res) => {
   try {
-    console.log("REQ BODY :", req.body);
+    console.log("RAW BODY (req.body) :", req.body);
 
-    // On récupère les champs envoyés
+    let body = req.body;
+
+    // Si on reçoit une string → on tente de parser le JSON
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        console.error("Erreur JSON.parse sur le body :", e);
+        return res
+          .status(400)
+          .json({ error: "Corps de requête JSON invalide." });
+      }
+    }
+
+    console.log("PARSED BODY :", body);
+
     const {
       text,
       language = "fr",
       tone = "neutral",
       goal = "generic",
-    } = req.body;
+    } = body || {};
 
     if (!text || text.trim().length === 0) {
       return res
@@ -73,7 +90,7 @@ Voici le texte à analyser et optimiser :
 `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini", // tu peux changer de modèle si besoin
+      model: "gpt-4.1-mini",
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
@@ -101,5 +118,5 @@ Voici le texte à analyser et optimiser :
 });
 
 app.listen(port, () => {
-  console.log(`🚀 GEO backend LIVE v1 sur le port ${port}`);
+  console.log(`🚀 GEO backend LIVE v2 sur le port ${port}`);
 });
