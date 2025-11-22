@@ -5,30 +5,32 @@ const OpenAI = require("openai");
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middlewares
+// === Middlewares ===
 app.use(cors());
+app.use(express.text({ type: "*/*" })); // on parse tout comme texte
 
-// ⚠️ On lit TOUT le body comme du texte, peu importe le Content-Type
-app.use(express.text({ type: "*/*" }));
-
-// Client OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// === Client IA (Groq, compatible OpenAI) ===
+// Clé à mettre dans Render : GROQ_API_KEY = ta clé Groq
+const aiClient = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
 });
 
-// Route de test
+// === Route de test ===
 app.get("/", (req, res) => {
-  res.json({ status: "ok", message: "GEO backend LIVE v2" });
+  res.json({
+    status: "ok",
+    api: "GEO-optimizer",
+    message: "GEO-optimizer backend (Groq) is live",
+  });
 });
 
-// Route principale d'optimisation
+// === Route principale : optimisation GEO ===
 app.post("/api/optimize", async (req, res) => {
   try {
-    console.log("RAW BODY (req.body) :", req.body);
-
     let body = req.body;
 
-    // Si on reçoit une string → on tente de parser le JSON
+    // Parse du JSON
     if (typeof body === "string") {
       try {
         body = JSON.parse(body);
@@ -40,8 +42,6 @@ app.post("/api/optimize", async (req, res) => {
       }
     }
 
-    console.log("PARSED BODY :", body);
-
     const {
       text,
       language = "fr",
@@ -49,14 +49,22 @@ app.post("/api/optimize", async (req, res) => {
       goal = "generic",
     } = body || {};
 
-    const systemPrompt = `
-Tu es un expert en "Generative Engine Optimization" (GEO).
-Ton rôle :
-1) Analyser un texte et estimer sa "visibilité" dans les moteurs d'IA générative (ChatGPT, Perplexity, etc.).
-2) Réécrire le texte pour maximiser cette visibilité.
-3) Renvoyer la réponse STRICTEMENT au format JSON, sans texte autour.
+    if (!text || !text.trim()) {
+      return res
+        .status(400)
+        .json({ error: "Le champ 'text' est obligatoire." });
+    }
 
-Le JSON doit suivre ce schéma :
+    // === PROMPTS ===
+    const systemPrompt = `
+Tu es l'expert de GEO-optimizer, un moteur d'optimisation GEO (Generative Engine Optimization).
+
+Ton rôle :
+1) Analyser le texte fourni et estimer sa "visibilité" dans les moteurs d'IA générative (ChatGPT, Perplexity, Gemini, Claude, etc.).
+2) Réécrire ce texte pour maximiser son impact et sa visibilité.
+3) Renvoyer **UNIQUEMENT** un JSON strict.
+
+FORMAT JSON OBLIGATOIRE :
 {
   "optimizedText": "string",
   "score": {
@@ -68,49 +76,3 @@ Le JSON doit suivre ce schéma :
   "explanation": "string",
   "suggestedMetadata": {
     "title": "string",
-    "summary": "string",
-    "keywords": ["string"]
-  }
-}
-`;
-
-    const userPrompt = `
-Langue cible : ${language}
-Ton souhaité : ${tone}
-Objectif du texte : ${goal}
-
-Voici le texte à analyser et optimiser :
-"""${text}"""
-`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    });
-
-    const raw = completion.choices[0]?.message?.content;
-    let parsed;
-
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      console.error("Erreur de parsing JSON :", e, "Réponse brute :", raw);
-      return res
-        .status(500)
-        .json({ error: "Erreur interne : réponse IA illisible." });
-    }
-
-    res.json(parsed);
-  } catch (err) {
-    console.error("Erreur dans /api/optimize :", err);
-    res.status(500).json({ error: "Erreur serveur." });
-  }
-});
-
-app.listen(port, () => {
-  console.log(`🚀 GEO backend LIVE v2 sur le port ${port}`);
-});
