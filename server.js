@@ -49,12 +49,6 @@ app.post("/api/optimize", async (req, res) => {
       goal = "generic",
     } = body || {};
 
-    if (!text || text.trim().length === 0) {
-      return res
-        .status(400)
-        .json({ error: "Le champ 'text' est obligatoire." });
-    }
-
     const systemPrompt = `
 Tu es un expert en "Generative Engine Optimization" (GEO).
 Ton rôle :
